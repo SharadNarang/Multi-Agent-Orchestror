@@ -494,85 +494,39 @@ function App() {
   // Render Build Agents View
   const renderBuildAgentsView = () => (
     <div className="build-agents-container">
-      <div className="build-agents-header">
-        <h1>🔧 Build Agents</h1>
-        <p>Create and configure your custom AI agents</p>
-      </div>
-
-      <div className="build-agents-content">
-        <div className="agentic-builder-card">
-          <div className="builder-icon">
-            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="64" height="64" rx="12" fill="#EB1000"/>
-              <path d="M32 16L18 48H25L28 40H36L39 48H46L32 16Z" fill="white"/>
-              <path d="M32 24L37 36H27L32 24Z" fill="white"/>
+      <div className="build-agents-header-bar">
+        <div className="header-info">
+          <div className="adobe-logo-small">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="32" height="32" rx="6" fill="#EB1000"/>
+              <path d="M16 8L9 24H12.5L14 20.5H18L19.5 24H23L16 8Z" fill="white"/>
+              <path d="M16 12L18.5 18.5H13.5L16 12Z" fill="white"/>
             </svg>
           </div>
-          <h2>Adobe Agentic Builder</h2>
-          <p className="builder-description">
-            Access the Adobe Agentic Builder platform to design, configure, and deploy custom AI agents 
-            tailored to your specific needs. Build sophisticated agent workflows with visual tools.
-          </p>
-          
-          <div className="builder-features">
-            <div className="feature-item">
-              <span className="feature-icon">🎨</span>
-              <div>
-                <strong>Visual Agent Designer</strong>
-                <p>Drag-and-drop interface for agent creation</p>
-              </div>
-            </div>
-            <div className="feature-item">
-              <span className="feature-icon">🔗</span>
-              <div>
-                <strong>Workflow Integration</strong>
-                <p>Connect agents to your existing systems</p>
-              </div>
-            </div>
-            <div className="feature-item">
-              <span className="feature-icon">🚀</span>
-              <div>
-                <strong>One-Click Deployment</strong>
-                <p>Deploy agents directly to production</p>
-              </div>
-            </div>
-            <div className="feature-item">
-              <span className="feature-icon">📊</span>
-              <div>
-                <strong>Performance Analytics</strong>
-                <p>Monitor and optimize agent performance</p>
-              </div>
-            </div>
-          </div>
-
-          <a 
-            href="https://agentic-builder-dev.corp.adobe.com/agent-space"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="builder-launch-btn"
-          >
-            <span className="btn-icon">🚀</span>
-            Launch Agentic Builder
-            <span className="external-link-icon">↗</span>
-          </a>
-
-          <div className="builder-info">
-            <p>
-              <strong>Note:</strong> Requires Adobe corporate network access and valid credentials.
-            </p>
+          <div className="header-text">
+            <h2>Adobe Agentic Builder</h2>
+            <p>Design, configure, and deploy custom AI agents</p>
           </div>
         </div>
+        <a 
+          href="https://agentic-builder-dev.corp.adobe.com/agent-space"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="open-new-tab-btn"
+          title="Open in new tab"
+        >
+          <span>↗</span>
+        </a>
+      </div>
 
-        <div className="quick-tips">
-          <h3>Quick Tips</h3>
-          <ul>
-            <li>Start with pre-built agent templates for common use cases</li>
-            <li>Use the visual workflow editor to define agent behavior</li>
-            <li>Test agents in sandbox mode before deployment</li>
-            <li>Monitor agent performance metrics in real-time</li>
-            <li>Export agent configurations for version control</li>
-          </ul>
-        </div>
+      <div className="agentic-builder-iframe-container">
+        <iframe 
+          src="https://agentic-builder-dev.corp.adobe.com/agent-space"
+          className="agentic-builder-iframe"
+          title="Adobe Agentic Builder"
+          allow="clipboard-write; clipboard-read"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+        />
       </div>
     </div>
   )
