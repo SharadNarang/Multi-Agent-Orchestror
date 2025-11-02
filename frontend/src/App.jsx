@@ -15,6 +15,70 @@ function App() {
   const [agentStats, setAgentStats] = useState(null)
   const [tasks, setTasks] = useState([])
   const [isPowerUser, setIsPowerUser] = useState(false)
+  const [isEmbedded, setIsEmbedded] = useState(false)
+
+  // Detect if running in iFrame
+  useEffect(() => {
+    const inIframe = window.self !== window.top
+    setIsEmbedded(inIframe)
+    
+    if (inIframe) {
+      console.log('🖼️ Running in iFrame (Adobe Agentic Builder)')
+      
+      // Notify parent that we're ready
+      window.parent.postMessage({
+        type: 'ORCHESTRATOR_READY',
+        data: { status: 'ready' }
+      }, '*')
+      
+      // Listen for messages from parent
+      const handleParentMessage = (event) => {
+        // Validate origin for production
+        // if (event.origin !== 'https://agentic-builder-dev.corp.adobe.com') return
+        
+        const { type, data } = event.data
+        
+        switch (type) {
+          case 'EXECUTE_TASK':
+            // Handle task from parent
+            if (data.query) {
+              setInputMessage(data.query)
+              // Auto-submit if requested
+              if (data.autoSubmit) {
+                setTimeout(() => handleSendMessage(), 100)
+              }
+            }
+            break
+          case 'SET_VIEW':
+            if (data.view) {
+              setActiveView(data.view)
+            }
+            break
+          case 'TOGGLE_SIDEBAR':
+            setSidebarOpen(prev => !prev)
+            break
+          default:
+            console.log('Unknown message type:', type)
+        }
+      }
+      
+      window.addEventListener('message', handleParentMessage)
+      return () => window.removeEventListener('message', handleParentMessage)
+    }
+  }, [])
+  
+  // Send status updates to parent if embedded
+  useEffect(() => {
+    if (isEmbedded && window.parent) {
+      window.parent.postMessage({
+        type: 'TASK_STATUS_UPDATE',
+        data: {
+          taskCount: tasks.length,
+          activeAgents: agents.filter(a => a.status === 'active').length
+        }
+      }, '*')
+    }
+  }, [tasks, agents, isEmbedded])
 
   useEffect(() => {
     fetchAgents()
@@ -514,7 +578,14 @@ function App() {
   )
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${isEmbedded ? 'embedded' : ''}`}>
+      {/* Embedded Mode Indicator */}
+      {isEmbedded && (
+        <div className="embedded-indicator">
+          Embedded in Adobe Agentic Builder
+        </div>
+      )}
+      
       {/* Sidebar */}
       <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">

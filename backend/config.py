@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     backend_api_url: str = "http://localhost:8000"
     frontend_url: str = "http://localhost:3000"
     
+    # iFrame Embedding Support
+    adobe_agentic_builder_url: str = "https://agentic-builder-dev.corp.adobe.com"
+    allow_iframe_embedding: bool = True
+    
     class Config:
         env_file = ".env"
 

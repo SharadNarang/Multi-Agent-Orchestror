@@ -2,12 +2,14 @@
 Main FastAPI Application
 Multi-Agent Orchestrator with A2A Protocol Support
 """
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 import uvicorn
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import get_db, engine, Base
 from models.agent import Agent, AgentType, AgentStatus
@@ -31,14 +33,41 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware
+# CORS middleware - Allow frontend and Adobe Agentic Builder
+allowed_origins = [settings.frontend_url]
+if settings.allow_iframe_embedding:
+    allowed_origins.append(settings.adobe_agentic_builder_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
+
+# iFrame Security Middleware
+class IFrameSecurityMiddleware(BaseHTTPMiddleware):
+    """Middleware to add security headers for iFrame embedding"""
+    
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        
+        if settings.allow_iframe_embedding:
+            # Allow embedding from Adobe Agentic Builder
+            response.headers["X-Frame-Options"] = f"ALLOW-FROM {settings.adobe_agentic_builder_url}"
+            response.headers["Content-Security-Policy"] = (
+                f"frame-ancestors 'self' {settings.adobe_agentic_builder_url} {settings.frontend_url};"
+            )
+        else:
+            # Prevent embedding
+            response.headers["X-Frame-Options"] = "DENY"
+            response.headers["Content-Security-Policy"] = "frame-ancestors 'none';"
+        
+        return response
+
+app.add_middleware(IFrameSecurityMiddleware)
 
 # Pydantic models for request/response
 class AgentRegistration(BaseModel):
