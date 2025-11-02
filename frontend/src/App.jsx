@@ -60,34 +60,103 @@ function App() {
     }
 
     setMessages([...messages, userMessage])
+    const taskDescription = inputMessage
     setInputMessage('')
     setLoading(true)
 
     try {
+      // Create the task
       const taskResponse = await axios.post(`${API_BASE}/api/tasks`, {
-        description: inputMessage,
+        description: taskDescription,
         user_id: 'demo-user',
         session_id: sessionId
       })
 
       setTasks(prev => [taskResponse.data, ...prev])
+      const taskId = taskResponse.data.task_id
 
-      const aiMessage = {
+      // Show initial processing message
+      const processingMessage = {
         role: 'assistant',
-        content: `✅ Task created successfully!\n\n🎯 Task ID: ${taskResponse.data.task_id}\n📊 Status: ${taskResponse.data.status}\n\nI'm coordinating multiple AI agents to handle: "${inputMessage}"\n\nAgents involved:\n${taskResponse.data.plan?.steps?.map((s, i) => `${i + 1}. ${s.agent_name || 'Agent'}: ${s.description}`).join('\n') || 'Planning in progress...'}`,
+        content: `🔄 Processing your request...\n\n🎯 Task ID: ${taskId}\n📊 Status: ${taskResponse.data.status}\n\nCoordinating with AI agents:\n${taskResponse.data.plan?.steps?.map((s, i) => `${i + 1}. ${s.agent_name || 'Agent'}: ${s.description}`).join('\n') || 'Planning in progress...'}\n\n⏳ Please wait while agents process your request...`,
         timestamp: new Date().toISOString(),
-        taskId: taskResponse.data.task_id
+        taskId: taskId
       }
 
-      setMessages(prev => [...prev, aiMessage])
+      setMessages(prev => [...prev, processingMessage])
+
+      // Poll for task completion
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await axios.get(`${API_BASE}/api/tasks/${taskId}`)
+          const taskStatus = statusResponse.data
+
+          if (taskStatus.status === 'completed') {
+            clearInterval(pollInterval)
+            setLoading(false)
+
+            // Extract the agent's response from the result
+            let agentResponse = 'Task completed successfully!'
+            
+            if (taskStatus.result && taskStatus.result.steps && taskStatus.result.steps.length > 0) {
+              const firstStep = taskStatus.result.steps[0]
+              if (firstStep.content && firstStep.content.response) {
+                agentResponse = firstStep.content.response
+              } else if (firstStep.content && firstStep.content.status) {
+                agentResponse = JSON.stringify(firstStep.content, null, 2)
+              }
+            } else if (taskStatus.result && taskStatus.result.summary) {
+              agentResponse = taskStatus.result.summary
+            }
+
+            const resultMessage = {
+              role: 'assistant',
+              content: agentResponse,
+              timestamp: new Date().toISOString(),
+              taskId: taskId
+            }
+
+            setMessages(prev => {
+              // Remove the processing message and add the result
+              const withoutProcessing = prev.filter(m => m.taskId !== taskId)
+              return [...withoutProcessing, resultMessage]
+            })
+
+          } else if (taskStatus.status === 'failed') {
+            clearInterval(pollInterval)
+            setLoading(false)
+
+            const errorMessage = {
+              role: 'assistant',
+              content: `❌ Task failed.\n\nError: ${taskStatus.result?.error || 'Unknown error occurred'}`,
+              timestamp: new Date().toISOString(),
+              taskId: taskId
+            }
+
+            setMessages(prev => {
+              const withoutProcessing = prev.filter(m => m.taskId !== taskId)
+              return [...withoutProcessing, errorMessage]
+            })
+          }
+        } catch (error) {
+          console.error('Error polling task status:', error)
+        }
+      }, 2000) // Poll every 2 seconds
+
+      // Timeout after 60 seconds
+      setTimeout(() => {
+        clearInterval(pollInterval)
+        setLoading(false)
+      }, 60000)
+
     } catch (error) {
+      console.error('Error creating task:', error)
       const errorMessage = {
         role: 'assistant',
-        content: '❌ Sorry, I encountered an error. Please ensure:\n• Backend services are running\n• Groq API key is configured\n• All agents are active',
+        content: '❌ Sorry, I encountered an error creating the task. Please ensure:\n• Backend services are running (http://localhost:8000)\n• Groq API key is configured\n• All agents are registered and active',
         timestamp: new Date().toISOString()
       }
       setMessages(prev => [...prev, errorMessage])
-    } finally {
       setLoading(false)
     }
   }
