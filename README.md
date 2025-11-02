@@ -315,6 +315,7 @@ python main.py  # Will recreate the database
 
 ## 📚 Additional Documentation
 
+- [Service Flow](SERVICE_FLOW.md) - Architecture and service interaction diagrams
 - [Backend README](backend/README.md) - Backend-specific documentation
 - [Frontend README](frontend/README.md) - Frontend-specific documentation
 - [API Guide](API_GUIDE.md) - Detailed API documentation
