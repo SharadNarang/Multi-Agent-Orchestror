@@ -52,11 +52,43 @@ class TaskPlanner:
         Available Agents:
         {json.dumps(agent_info, indent=2)}
         
+        CRITICAL ROUTING GUIDELINES:
+        
+        1. ALWAYS prefer the SIMPLEST agent that can complete the task
+        
+        2. Use DataAnalyzer (API agent) for:
+           - Simple calculations (1+1, 5*10, math operations)
+           - Quick facts and definitions (What is X?, Define Y)
+           - Short text processing and summarization
+           - Data analysis tasks
+           - Any task completable in under 5 seconds
+           - Single-step queries
+        
+        3. Use ResearchAgent (A2A/LangGraph) for:
+           - Multi-step reasoning and research
+           - Complex analysis requiring multiple sources
+           - Strategic planning and recommendations
+           - Tasks requiring deep investigation
+           - Workflows with multiple stages
+        
+        4. Task Complexity Assessment:
+           - Simple (1 step, < 5 sec) → DataAnalyzer
+           - Medium (2-3 steps, < 15 sec) → DataAnalyzer or light planning
+           - Complex (4+ steps, > 15 sec) → ResearchAgent with full workflow
+        
+        EXAMPLES:
+        - "1+1" → DataAnalyzer (simple calculation)
+        - "What is AI?" → DataAnalyzer (simple definition)
+        - "Summarize this text" → DataAnalyzer (simple processing)
+        - "Research AI impact on healthcare and create strategic recommendations" → ResearchAgent (complex research)
+        - "Analyze quarterly sales data and identify trends" → DataAnalyzer (data analysis)
+        
         Create a plan with these elements:
-        1. Break down the task into sequential steps
-        2. Assign each step to the most appropriate agent
-        3. Define inputs and expected outputs for each step
-        4. Identify dependencies between steps
+        1. Assess task complexity first
+        2. Break down the task into sequential steps (keep it simple if possible)
+        3. Assign each step to the MOST APPROPRIATE agent (prefer simpler agents)
+        4. Define inputs and expected outputs for each step
+        5. Identify dependencies between steps
         
         Return your response as JSON with this structure:
         {{

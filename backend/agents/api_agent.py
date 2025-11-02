@@ -27,7 +27,13 @@ class APIAgent:
             "data_analysis",
             "text_processing",
             "summarization",
-            "format_conversion"
+            "format_conversion",
+            "calculation",
+            "math",
+            "arithmetic",
+            "simple_queries",
+            "quick_answers",
+            "definitions"
         ]
     
     async def process_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
@@ -45,6 +51,8 @@ class APIAgent:
             return await self._summarize(data)
         elif task_type == "format_conversion":
             return await self._convert_format(data, request.get("target_format"))
+        elif task_type == "calculation" or task_type == "simple_query":
+            return await self._handle_simple_query(data or instructions)
         else:
             return {
                 "status": "error",
@@ -122,6 +130,27 @@ class APIAgent:
             "status": "success",
             "agent": self.agent_name,
             "task": "format_conversion",
+            "result": response.content
+        }
+    
+    async def _handle_simple_query(self, query: str) -> Dict[str, Any]:
+        """Handle simple queries, calculations, and quick answers"""
+        
+        prompt = f"""
+        Answer this query directly and concisely:
+        {query}
+        
+        If it's a calculation, show the result.
+        If it's a definition, provide a clear, brief explanation.
+        Keep your response short and to the point.
+        """
+        
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        
+        return {
+            "status": "success",
+            "agent": self.agent_name,
+            "task": "simple_query",
             "result": response.content
         }
     
