@@ -11,11 +11,29 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [sessionId, setSessionId] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [activeView, setActiveView] = useState('chat') // chat, dashboard, agents, buildAgents
+  const [activeView, setActiveView] = useState('chat') // chat, dashboard, agents, buildAgents, registerAgent
   const [agentStats, setAgentStats] = useState(null)
   const [tasks, setTasks] = useState([])
-  const [isPowerUser, setIsPowerUser] = useState(false)
+  const [isPowerUser, setIsPowerUser] = useState(false) // Admin mode toggle
   const [isEmbedded, setIsEmbedded] = useState(false)
+  
+  // Registration wizard state
+  const [templates, setTemplates] = useState([])
+  const [registrationStep, setRegistrationStep] = useState(1)
+  const [regForm, setRegForm] = useState({
+    name: '',
+    description: '',
+    endpoint: '',
+    capabilities: [],
+    template_id: null,
+    auth_type: 'none',
+    auth_token: '',
+    test_query: 'Hello, this is a test',
+    custom_request_mapping: '',
+    custom_response_mapping: ''
+  })
+  const [testResult, setTestResult] = useState(null)
+  const [registering, setRegistering] = useState(false)
 
   // Detect if running in iFrame
   useEffect(() => {
@@ -86,6 +104,13 @@ function App() {
     fetchAgentStats()
   }, [])
 
+  // Fetch templates when navigating to register agent view
+  useEffect(() => {
+    if (activeView === 'registerAgent') {
+      fetchTemplates()
+    }
+  }, [activeView])
+
   const fetchAgents = async () => {
     try {
       const response = await axios.get(`${API_BASE}/api/agents`)
@@ -112,6 +137,125 @@ function App() {
       setSessionId(response.data.session_id)
     } catch (error) {
       console.error('Error creating session:', error)
+    }
+  }
+
+  // Fetch agent templates
+  const fetchTemplates = async () => {
+    try {
+      const response = await axios.get(`${API_BASE}/api/agent-templates`)
+      setTemplates(response.data)
+    } catch (error) {
+      console.error('Error fetching templates:', error)
+    }
+  }
+
+  // Test agent connection
+  const testAgentConnection = async () => {
+    if (!regForm.endpoint || !regForm.template_id) {
+      alert('Please enter endpoint and select template')
+      return
+    }
+
+    setTestResult({ testing: true })
+
+    try {
+      const template = templates.find(t => t.id === regForm.template_id)
+      
+      const response = await axios.post(`${API_BASE}/api/agents/test-connection`, {
+        endpoint: regForm.endpoint,
+        template_config: {
+          request_mapping: template.request_mapping,
+          response_mapping: template.response_mapping
+        },
+        test_query: regForm.test_query,
+        auth_headers: regForm.auth_type === 'bearer' ? {
+          'Authorization': `Bearer ${regForm.auth_token}`
+        } : null
+      })
+
+      setTestResult(response.data)
+    } catch (error) {
+      setTestResult({
+        success: false,
+        error: error.response?.data?.detail || error.message
+      })
+    }
+  }
+
+  // Check if selected template is custom
+  const isCustomTemplate = () => {
+    const selectedTemplate = templates.find(t => t.id === regForm.template_id)
+    return selectedTemplate?.name === 'custom'
+  }
+
+  // Register agent
+  const registerAgent = async () => {
+    setRegistering(true)
+
+    try {
+      // Prepare custom config if using custom template and mappings provided
+      let customConfig = null
+      if (isCustomTemplate() && (regForm.custom_request_mapping || regForm.custom_response_mapping)) {
+        customConfig = {}
+        if (regForm.custom_request_mapping) {
+          try {
+            customConfig.request_mapping = JSON.parse(regForm.custom_request_mapping)
+          } catch (e) {
+            alert('Invalid JSON in Request Mapping')
+            setRegistering(false)
+            return
+          }
+        }
+        if (regForm.custom_response_mapping) {
+          try {
+            customConfig.response_mapping = JSON.parse(regForm.custom_response_mapping)
+          } catch (e) {
+            alert('Invalid JSON in Response Mapping')
+            setRegistering(false)
+            return
+          }
+        }
+      }
+
+      const response = await axios.post(`${API_BASE}/api/agents/register-with-template`, {
+        name: regForm.name,
+        description: regForm.description,
+        endpoint: regForm.endpoint,
+        capabilities: regForm.capabilities,
+        template_id: regForm.template_id,
+        custom_config: customConfig,
+        auth_config: regForm.auth_type === 'bearer' ? {
+          type: 'bearer_token',
+          token: regForm.auth_token
+        } : { type: 'none' }
+      })
+
+      alert(`✅ Agent "${response.data.name}" registered successfully!`)
+      
+      // Reset form and go back to agents view
+      setRegistrationStep(1)
+      setRegForm({
+        name: '',
+        description: '',
+        endpoint: '',
+        capabilities: [],
+        template_id: null,
+        auth_type: 'none',
+        auth_token: '',
+        test_query: 'Hello, this is a test',
+        custom_request_mapping: '',
+        custom_response_mapping: ''
+      })
+      setTestResult(null)
+      setActiveView('agents')
+      
+      // Refresh agents list
+      fetchAgents()
+    } catch (error) {
+      alert(`❌ Error: ${error.response?.data?.detail || error.message}`)
+    } finally {
+      setRegistering(false)
     }
   }
 
@@ -261,10 +405,10 @@ function App() {
               <span>▶</span> Get Started
             </button>
             <button className="action-btn" onClick={() => setActiveView('agents')}>
-              <span>🤖</span> VIEW AGENTS
+              <span>🤖</span> AGENT DISCOVERY
             </button>
             <button className="action-btn" onClick={() => setActiveView('dashboard')}>
-              <span>📊</span> DASHBOARD
+              <span>📊</span> OBSERVABILITY
             </button>
           </div>
 
@@ -317,7 +461,7 @@ function App() {
   const renderDashboardView = () => (
     <div className="dashboard-container">
       <div className="dashboard-header">
-        <h1>📊 System Dashboard</h1>
+        <h1>📊 Agent Observability and Monitoring</h1>
         <p>Monitor your multi-agent orchestrator system</p>
       </div>
 
@@ -531,6 +675,335 @@ function App() {
     </div>
   )
 
+  // Render Register Agent Wizard
+  const renderRegisterAgentView = () => (
+    <div className="register-agent-container">
+      <div className="register-header">
+        <h1>➕ Register External Agent</h1>
+        <p>Connect any REST API agent using configuration templates</p>
+      </div>
+
+      <div className="wizard-progress">
+        <div className={`wizard-step-indicator ${registrationStep >= 1 ? 'active' : ''}`}>1. Template</div>
+        <div className={`wizard-step-indicator ${registrationStep >= 2 ? 'active' : ''}`}>2. Info</div>
+        <div className={`wizard-step-indicator ${registrationStep >= 3 ? 'active' : ''}`}>3. Connection</div>
+        {isCustomTemplate() && (
+          <div className={`wizard-step-indicator ${registrationStep >= 3.5 ? 'active' : ''}`}>3.5. Mapping</div>
+        )}
+        <div className={`wizard-step-indicator ${registrationStep >= 4 ? 'active' : ''}`}>4. Test</div>
+        <div className={`wizard-step-indicator ${registrationStep >= 5 ? 'active' : ''}`}>5. Register</div>
+      </div>
+
+      <div className="wizard-content">
+        {/* Step 1: Select Template */}
+        {registrationStep === 1 && (
+          <div className="wizard-step">
+            <h2>Select Agent Template</h2>
+            <p>Choose a template that matches your agent's framework</p>
+            
+            <div className="template-grid">
+              {templates.map(template => (
+                <div 
+                  key={template.id}
+                  className={`template-card ${regForm.template_id === template.id ? 'selected' : ''}`}
+                  onClick={() => setRegForm({...regForm, template_id: template.id})}
+                >
+                  <h3>{template.display_name}</h3>
+                  <p>{template.description}</p>
+                  <div className="template-badge">{template.framework}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="wizard-actions">
+              <button 
+                className="btn-next"
+                onClick={() => setRegistrationStep(2)}
+                disabled={!regForm.template_id}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Basic Info */}
+        {registrationStep === 2 && (
+          <div className="wizard-step">
+            <h2>Basic Information</h2>
+            
+            <div className="form-group">
+              <label>Agent Name *</label>
+              <input 
+                type="text"
+                value={regForm.name}
+                onChange={(e) => setRegForm({...regForm, name: e.target.value})}
+                placeholder="e.g., My Research Agent"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Description *</label>
+              <textarea
+                value={regForm.description}
+                onChange={(e) => setRegForm({...regForm, description: e.target.value})}
+                placeholder="What does this agent do?"
+                rows={3}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Capabilities</label>
+              <input 
+                type="text"
+                value={regForm.capabilities.join(', ')}
+                onChange={(e) => setRegForm({
+                  ...regForm, 
+                  capabilities: e.target.value.split(',').map(c => c.trim()).filter(c => c)
+                })}
+                placeholder="e.g., research, analysis, writing"
+              />
+              <small>Comma-separated list of capabilities</small>
+            </div>
+
+            <div className="wizard-actions">
+              <button className="btn-back" onClick={() => setRegistrationStep(1)}>
+                ← Back
+              </button>
+              <button 
+                className="btn-next"
+                onClick={() => setRegistrationStep(3)}
+                disabled={!regForm.name || !regForm.description}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Connection */}
+        {registrationStep === 3 && (
+          <div className="wizard-step">
+            <h2>Connection Settings</h2>
+            
+            <div className="form-group">
+              <label>Endpoint URL *</label>
+              <input 
+                type="text"
+                value={regForm.endpoint}
+                onChange={(e) => setRegForm({...regForm, endpoint: e.target.value})}
+                placeholder="http://localhost:8003"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Authentication</label>
+              <select 
+                value={regForm.auth_type}
+                onChange={(e) => setRegForm({...regForm, auth_type: e.target.value})}
+              >
+                <option value="none">None</option>
+                <option value="bearer">Bearer Token</option>
+              </select>
+            </div>
+
+            {regForm.auth_type === 'bearer' && (
+              <div className="form-group">
+                <label>Authorization Token</label>
+                <input 
+                  type="password"
+                  value={regForm.auth_token}
+                  onChange={(e) => setRegForm({...regForm, auth_token: e.target.value})}
+                  placeholder="Enter your API token"
+                />
+              </div>
+            )}
+
+            <div className="wizard-actions">
+              <button className="btn-back" onClick={() => setRegistrationStep(2)}>
+                ← Back
+              </button>
+              <button 
+                className="btn-next"
+                onClick={() => setRegistrationStep(isCustomTemplate() ? 3.5 : 4)}
+                disabled={!regForm.endpoint}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3.5: Advanced Mapping Configuration (Custom Template Only) */}
+        {registrationStep === 3.5 && isCustomTemplate() && (
+          <div className="wizard-step">
+            <h2>⚙️ Advanced Mapping Configuration</h2>
+            <p className="step-description">
+              Define custom request/response mappings for your REST API. 
+              Use JSONPath expressions (e.g., <code>$.description</code>) to map fields.
+            </p>
+            
+            <div className="form-group">
+              <label>Request Mapping (JSON)</label>
+              <textarea
+                className="json-editor"
+                value={regForm.custom_request_mapping}
+                onChange={(e) => setRegForm({...regForm, custom_request_mapping: e.target.value})}
+                placeholder={`{
+  "method": "POST",
+  "path": "/process",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body_mapping": {
+    "query": "$.description"
+  }
+}`}
+                rows={12}
+              />
+              <small>Define how orchestrator requests map to your agent's API format</small>
+            </div>
+
+            <div className="form-group">
+              <label>Response Mapping (JSON)</label>
+              <textarea
+                className="json-editor"
+                value={regForm.custom_response_mapping}
+                onChange={(e) => setRegForm({...regForm, custom_response_mapping: e.target.value})}
+                placeholder={`{
+  "status_path": "$.status",
+  "result_path": "$.result",
+  "error_path": "$.error"
+}`}
+                rows={8}
+              />
+              <small>Define how to extract results from your agent's responses</small>
+            </div>
+
+            <div className="mapping-help">
+              <h4>💡 JSONPath Examples:</h4>
+              <ul>
+                <li><code>$.result</code> - Extract top-level "result" field</li>
+                <li><code>$.data.message</code> - Extract nested field</li>
+                <li><code>$.choices[0].text</code> - Extract from array</li>
+              </ul>
+            </div>
+
+            <div className="wizard-actions">
+              <button className="btn-back" onClick={() => setRegistrationStep(3)}>
+                ← Back
+              </button>
+              <button 
+                className="btn-next"
+                onClick={() => setRegistrationStep(4)}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Test Connection */}
+        {registrationStep === 4 && (
+          <div className="wizard-step">
+            <h2>Test Connection</h2>
+            <p>Send a test request to verify the agent is accessible</p>
+            
+            <div className="form-group">
+              <label>Test Query</label>
+              <input 
+                type="text"
+                value={regForm.test_query}
+                onChange={(e) => setRegForm({...regForm, test_query: e.target.value})}
+                placeholder="Hello, this is a test"
+              />
+            </div>
+
+            <button className="btn-test" onClick={testAgentConnection}>
+              🧪 Test Connection
+            </button>
+
+            {testResult && (
+              <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
+                {testResult.testing ? (
+                  <p>⏳ Testing connection...</p>
+                ) : testResult.success ? (
+                  <>
+                    <h3>✅ Connection Successful!</h3>
+                    <p>Status: {testResult.status_code || 200}</p>
+                    {testResult.extracted_result && (
+                      <div className="result-preview">
+                        <strong>Response:</strong>
+                        <pre>{typeof testResult.extracted_result === 'string' ? testResult.extracted_result.substring(0, 200) : JSON.stringify(testResult.extracted_result, null, 2).substring(0, 200)}...</pre>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <h3>❌ Connection Failed</h3>
+                    <p>{testResult.error}</p>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className="wizard-actions">
+              <button className="btn-back" onClick={() => setRegistrationStep(isCustomTemplate() ? 3.5 : 3)}>
+                ← Back
+              </button>
+              <button 
+                className="btn-next"
+                onClick={() => setRegistrationStep(5)}
+                disabled={!testResult || !testResult.success}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Register */}
+        {registrationStep === 5 && (
+          <div className="wizard-step">
+            <h2>Review & Register</h2>
+            
+            <div className="review-section">
+              <h3>Agent Details</h3>
+              <div className="review-item">
+                <strong>Name:</strong> {regForm.name}
+              </div>
+              <div className="review-item">
+                <strong>Description:</strong> {regForm.description}
+              </div>
+              <div className="review-item">
+                <strong>Endpoint:</strong> {regForm.endpoint}
+              </div>
+              <div className="review-item">
+                <strong>Template:</strong> {templates.find(t => t.id === regForm.template_id)?.display_name}
+              </div>
+              <div className="review-item">
+                <strong>Capabilities:</strong> {regForm.capabilities.join(', ') || 'None'}
+              </div>
+            </div>
+
+            <div className="wizard-actions">
+              <button className="btn-back" onClick={() => setRegistrationStep(4)}>
+                ← Back
+              </button>
+              <button 
+                className="btn-register"
+                onClick={registerAgent}
+                disabled={registering}
+              >
+                {registering ? 'Registering...' : '✅ Register Agent'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
   return (
     <div className={`app-container ${isEmbedded ? 'embedded' : ''}`}>
       {/* Embedded Mode Indicator */}
@@ -564,7 +1037,7 @@ function App() {
           New Chat
         </button>
 
-        {/* Power User Toggle */}
+        {/* Admin Toggle */}
         <div className="power-user-toggle">
           <label className="toggle-label">
             <input 
@@ -574,7 +1047,7 @@ function App() {
             />
             <span className="toggle-slider"></span>
             <span className="toggle-text">
-              {isPowerUser ? '⚡ Power User' : '👤 User'}
+              {isPowerUser ? '🔐 Admin' : '👤 User'}
             </span>
           </label>
         </div>
@@ -589,28 +1062,37 @@ function App() {
           </button>
           
           <button 
-            className={`nav-item ${activeView === 'buildAgents' ? 'active' : ''}`}
-            onClick={() => setActiveView('buildAgents')}
+            className={`nav-item ${activeView === 'agents' ? 'active' : ''}`}
+            onClick={() => setActiveView('agents')}
           >
-            <span className="nav-icon">🔧</span>
-            Build Agents
+            <span className="nav-icon">🤖</span>
+            Agent Discovery
+          </button>
+
+          <button 
+            className={`nav-item ${activeView === 'dashboard' ? 'active' : ''}`}
+            onClick={() => setActiveView('dashboard')}
+          >
+            <span className="nav-icon">📊</span>
+            Agent Observability
           </button>
 
           {isPowerUser && (
             <>
               <button 
-                className={`nav-item ${activeView === 'dashboard' ? 'active' : ''}`}
-                onClick={() => setActiveView('dashboard')}
+                className={`nav-item ${activeView === 'buildAgents' ? 'active' : ''}`}
+                onClick={() => setActiveView('buildAgents')}
               >
-                <span className="nav-icon">📊</span>
-                Dashboard
+                <span className="nav-icon">🔧</span>
+                Build Agents
               </button>
+              
               <button 
-                className={`nav-item ${activeView === 'agents' ? 'active' : ''}`}
-                onClick={() => setActiveView('agents')}
+                className={`nav-item ${activeView === 'registerAgent' ? 'active' : ''}`}
+                onClick={() => setActiveView('registerAgent')}
               >
-                <span className="nav-icon">🤖</span>
-                Agents
+                <span className="nav-icon">➕</span>
+                Register Agent
               </button>
             </>
           )}
@@ -637,23 +1119,13 @@ function App() {
           )}
         </div>
 
-        <div className="sidebar-footer">
-          <div className="agent-status">
-            <h4>Active Agents: {agents.filter(a => a.status === 'active').length}</h4>
-            {agents.slice(0, 2).map(agent => (
-              <div key={agent.id} className="agent-item">
-                <span className="status-dot"></span>
-                {agent.name}
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Main Content */}
       <div className="main-content">
         {activeView === 'chat' && renderChatView()}
         {activeView === 'buildAgents' && renderBuildAgentsView()}
+        {activeView === 'registerAgent' && renderRegisterAgentView()}
         {activeView === 'dashboard' && renderDashboardView()}
         {activeView === 'agents' && renderAgentsView()}
 
