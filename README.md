@@ -316,6 +316,7 @@ python main.py  # Will recreate the database
 ## 📚 Additional Documentation
 
 - [Service Flow](SERVICE_FLOW.md) - Architecture and service interaction diagrams
+- [REST API Agent Flow](REST_API_AGENT_FLOW.md) - REST API agent adapter pattern explained
 - [iFrame Integration](IFRAME_INTEGRATION.md) - Embedding in Adobe Agentic Builder
 - [Backend README](backend/README.md) - Backend-specific documentation
 - [Frontend README](frontend/README.md) - Frontend-specific documentation
