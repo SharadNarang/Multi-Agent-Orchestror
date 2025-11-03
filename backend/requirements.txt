@@ -9,3 +9,5 @@ langchain
 langchain-groq
 langgraph
 groq
+jsonpath-ng
+psycopg2-binary

@@ -15,6 +15,7 @@ from database import get_db, engine, Base
 from models.agent import Agent, AgentType, AgentStatus
 from models.task import Task, TaskStep, TaskStatus
 from models.memory import ConversationContext, Message
+from models.agent_config_template import AgentConfigTemplate  # Import for table creation
 from services.agent_registry import AgentRegistry
 from services.memory_service import MemoryService
 from orchestrator.task_planner import TaskPlanner
@@ -391,6 +392,110 @@ async def receive_a2a_message(message: A2AMessage, db: Session = Depends(get_db)
         "receiver": message.receiver,
         "processed_at": "now"
     }
+
+# Agent Registration Endpoints
+class TestAgentRequest(BaseModel):
+    endpoint: str
+    template_config: Dict[str, Any]
+    test_query: Optional[str] = "Hello, this is a test"
+    auth_headers: Optional[Dict[str, str]] = None
+
+class RegisterAgentWithTemplateRequest(BaseModel):
+    name: str
+    description: str
+    endpoint: str
+    capabilities: List[str]
+    template_id: int
+    custom_config: Optional[Dict[str, Any]] = None
+    auth_config: Optional[Dict[str, Any]] = None
+
+@app.get("/api/agent-templates", response_model=List[Dict[str, Any]])
+async def list_agent_templates(db: Session = Depends(get_db)):
+    """List all available agent configuration templates"""
+    from services.agent_registration_service import AgentRegistrationService
+    
+    service = AgentRegistrationService(db)
+    # Initialize templates if they don't exist
+    service.initialize_templates()
+    
+    return service.list_templates()
+
+@app.get("/api/agent-templates/{template_id}", response_model=Dict[str, Any])
+async def get_agent_template(template_id: int, db: Session = Depends(get_db)):
+    """Get a specific agent template"""
+    from services.agent_registration_service import AgentRegistrationService
+    from models.agent_config_template import AgentConfigTemplate
+    
+    service = AgentRegistrationService(db)
+    template = service.get_template(template_id)
+    
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    return {
+        "id": template.id,
+        "name": template.name,
+        "display_name": template.display_name,
+        "description": template.description,
+        "framework": template.framework,
+        "request_mapping": template.request_mapping,
+        "response_mapping": template.response_mapping,
+        "auth_config": template.auth_config,
+        "example_request": template.example_request,
+        "example_response": template.example_response,
+        "is_builtin": template.is_builtin
+    }
+
+@app.post("/api/agents/test-connection", response_model=Dict[str, Any])
+async def test_agent_connection(
+    request: TestAgentRequest,
+    db: Session = Depends(get_db)
+):
+    """Test connection to an external agent"""
+    from services.agent_registration_service import AgentRegistrationService
+    
+    service = AgentRegistrationService(db)
+    result = await service.test_agent_connection(
+        endpoint=request.endpoint,
+        template_config=request.template_config,
+        test_query=request.test_query,
+        auth_headers=request.auth_headers
+    )
+    
+    return result
+
+@app.post("/api/agents/register-with-template", response_model=Dict[str, Any])
+async def register_agent_with_template(
+    request: RegisterAgentWithTemplateRequest,
+    db: Session = Depends(get_db)
+):
+    """Register a new agent using a configuration template"""
+    from services.agent_registration_service import AgentRegistrationService
+    
+    service = AgentRegistrationService(db)
+    
+    try:
+        agent = service.register_agent_with_template(
+            name=request.name,
+            description=request.description,
+            endpoint=request.endpoint,
+            capabilities=request.capabilities,
+            template_id=request.template_id,
+            custom_config=request.custom_config,
+            auth_config=request.auth_config
+        )
+        
+        return {
+            "id": agent.id,
+            "name": agent.name,
+            "status": agent.status,
+            "agent_type": agent.agent_type,
+            "endpoint": agent.endpoint,
+            "capabilities": agent.capabilities,
+            "config": agent.config
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 # Helper functions
 async def execute_task_background(task_id: int, db: Session):
