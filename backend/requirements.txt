@@ -11,3 +11,4 @@ langgraph
 groq
 jsonpath-ng
 psycopg2-binary
+pyyaml
