@@ -19,23 +19,29 @@ A sophisticated multi-agent orchestration system with A2A (Agent-to-Agent) proto
 ┌─────────────────────────────────────────────────────────┐
 │                    Frontend (React)                      │
 │                   Port 3000                              │
+│  • Task Management  • Agent Discovery                   │
+│  • Power User Mode  • Template-based Registration       │
 └────────────────────┬────────────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────────────┐
 │           Main Orchestrator (FastAPI)                    │
 │                   Port 8000                              │
 │  • Task Planning & Execution                             │
-│  • Agent Registry                                        │
-│  • Memory Service                                        │
+│  • Agent Registry & Registration Service                 │
+│  • Memory Service & Template Management                  │
 └─────────┬──────────────────────┬────────────────────────┘
           │                      │
+          │ A2A/REST Protocols   │ Multiple Protocols
+          │                      │
 ┌─────────▼────────────┐  ┌─────▼──────────────────────┐
-│  A2A Server          │  │  API Agent                  │
-│  (LangGraph)         │  │  (Simple API)               │
-│  Port 8001           │  │  Port 8002                  │
-│  • ResearchAgent     │  │  • DataAnalyzer             │
-│  • Complex Workflows │  │  • Data Processing          │
-└──────────────────────┘  └─────────────────────────────┘
+│  A2A Server          │  │  API Agent Services         │
+│  (LangGraph)         │  │                             │
+│  Port 8001           │  │  • API Agent (8002)         │
+│  • ResearchAgent     │  │  • CrewAI Agent (8003)      │
+│  • Complex Workflows │  │  • Databricks Agent (8004)  │
+│                      │  │  • OpenAI Compatible (8005) │
+└──────────────────────┘  │  • Custom Agents (8006+)    │
+                          └─────────────────────────────┘
 ```
 
 ## 🚀 Quick Start
@@ -315,7 +321,10 @@ python main.py  # Will recreate the database
 
 ## 📚 Additional Documentation
 
+- [System Architecture](SYSTEM_ARCHITECTURE.md) - Complete system architecture and module documentation
 - [Service Flow](SERVICE_FLOW.md) - Architecture and service interaction diagrams
+- [Agent Registration Implementation](AGENT_REGISTRATION_IMPLEMENTATION.md) - Agent registration system details
+- [YAML Configuration Guide](YAML_CONFIGURATION_GUIDE.md) - Template configuration guide
 - [REST API Agent Flow](REST_API_AGENT_FLOW.md) - REST API agent adapter pattern explained
 - [iFrame Integration](IFRAME_INTEGRATION.md) - Embedding in Adobe Agentic Builder
 - [Backend README](backend/README.md) - Backend-specific documentation

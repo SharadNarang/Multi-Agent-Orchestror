@@ -15,7 +15,7 @@ Complete guide to understanding the data flow and service interactions in the Mu
 
 ## 🏗️ System Overview
 
-The Multi-Agent Orchestrator consists of four main services that work together to process tasks through multiple AI agents.
+The Multi-Agent Orchestrator consists of multiple services that work together to process tasks through heterogeneous AI agents with different frameworks and protocols.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -32,6 +32,8 @@ The Multi-Agent Orchestrator consists of four main services that work together t
 │  • Task creation interface                                       │
 │  • Real-time status updates                                      │
 │  • Agent management UI                                           │
+│  • Power User mode (Agent Registration)                          │
+│  • Template-based agent discovery                                │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              │ REST API
@@ -47,31 +49,57 @@ The Multi-Agent Orchestrator consists of four main services that work together t
 │  └──────────────┘  └──────────────┘  └──────────────┘         │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────┐          │
+│  │      Agent Registration Service                   │          │
+│  │  • Template management (YAML-based)              │          │
+│  │  • Connection testing                             │          │
+│  │  • Response validation                            │          │
+│  │  • Dynamic agent registration                     │          │
+│  └──────────────────────────────────────────────────┘          │
+│                                                                  │
+│  ┌──────────────────────────────────────────────────┐          │
 │  │           Task Executor                           │          │
 │  │  • Coordinates agent communication                │          │
 │  │  • Manages task lifecycle                         │          │
 │  │  • Handles failures and retries                   │          │
+│  │  • Multi-protocol routing                         │          │
 │  └──────────────────────────────────────────────────┘          │
 └────────────┬────────────────────────┬───────────────────────────┘
              │                        │
-             │ A2A Protocol           │ REST API
+             │ A2A Protocol           │ REST API (Multiple Protocols)
              │                        │
 ┌────────────▼───────────┐  ┌────────▼──────────────────────────┐
-│   A2A Server Service   │  │     API Agent Service             │
-│     (LangGraph)        │  │      (Simple API)                 │
-│      Port: 8001        │  │       Port: 8002                  │
-│                        │  │                                   │
-│  ┌──────────────────┐ │  │  ┌─────────────────────────────┐ │
-│  │ ResearchAgent    │ │  │  │ DataAnalyzer                │ │
-│  │                  │ │  │  │                             │ │
-│  │ LangGraph        │ │  │  │ • Data processing           │ │
-│  │ Workflow:        │ │  │  │ • Summarization             │ │
-│  │ • Analyze        │ │  │  │ • Format conversion         │ │
-│  │ • Plan           │ │  │  └─────────────────────────────┘ │
-│  │ • Execute        │ │  │                                   │
-│  │ • Reflect        │ │  │                                   │
-│  │ • Finalize       │ │  │                                   │
+│   A2A Server Service   │  │     API Agent Services            │
+│     (LangGraph)        │  │      (Multiple Types)             │
+│      Port: 8001        │  │                                   │
+│                        │  │  ┌─────────────────────────────┐ │
+│  ┌──────────────────┐ │  │  │ API Agent (Port 8002)       │ │
+│  │ ResearchAgent    │ │  │  │ • Data processing           │ │
+│  │                  │ │  │  │ • Summarization             │ │
+│  │ LangGraph        │ │  │  └─────────────────────────────┘ │
+│  │ Workflow:        │ │  │                                   │
+│  │ • Analyze        │ │  │  ┌─────────────────────────────┐ │
+│  │ • Plan           │ │  │  │ CrewAI Agent (Port 8003)    │ │
+│  │ • Execute        │ │  │  │ • Multi-agent workflows     │ │
+│  │ • Reflect        │ │  │  │ • Role-based agents         │ │
+│  │ • Finalize       │ │  │  └─────────────────────────────┘ │
 │  └──────────────────┘ │  │                                   │
+│                        │  │  ┌─────────────────────────────┐ │
+│                        │  │  │ Databricks Agent (8004)     │ │
+│                        │  │  │ • Foundation models         │ │
+│                        │  │  │ • Llama, Mistral, etc.      │ │
+│                        │  │  └─────────────────────────────┘ │
+│                        │  │                                   │
+│                        │  │  ┌─────────────────────────────┐ │
+│                        │  │  │ OpenAI Compatible (8005)    │ │
+│                        │  │  │ • GPT-3.5, GPT-4            │ │
+│                        │  │  │ • Chat completions          │ │
+│                        │  │  └─────────────────────────────┘ │
+│                        │  │                                   │
+│                        │  │  ┌─────────────────────────────┐ │
+│                        │  │  │ Custom Agents (8006+)       │ │
+│                        │  │  │ • User-defined agents       │ │
+│                        │  │  │ • Custom protocols          │ │
+│                        │  │  └─────────────────────────────┘ │
 └────────────────────────┘  └───────────────────────────────────┘
              │                        │
              └────────────┬───────────┘
@@ -83,6 +111,8 @@ The Multi-Agent Orchestrator consists of four main services that work together t
              │                        │
              │  • OpenAI (GPT-4)     │
              │  • Groq (Llama)       │
+             │  • Databricks Models  │
+             │  • Custom LLMs        │
              └────────────────────────┘
 ```
 
@@ -141,19 +171,29 @@ App.jsx
 ```
 main.py
 ├── API Routes
-│   ├── /api/agents/*
-│   ├── /api/tasks/*
-│   └── /api/sessions/*
+│   ├── /api/agents/*              # Agent management
+│   ├── /api/tasks/*               # Task operations
+│   ├── /api/sessions/*            # Session management
+│   ├── /api/agent-templates/*     # Template management
+│   └── /a2a/message               # A2A protocol endpoint
 ├── services/
-│   ├── agent_registry.py    # Agent CRUD operations
-│   └── memory_service.py    # Session management
+│   ├── agent_registry.py          # Agent CRUD operations
+│   ├── agent_registration_service.py  # Template-based registration
+│   └── memory_service.py          # Session management
 ├── orchestrator/
-│   ├── task_planner.py      # Task decomposition
-│   └── task_executor.py     # Task execution
-└── models/
-    ├── agent.py             # Agent data model
-    ├── task.py              # Task data model
-    └── memory.py            # Memory data model
+│   ├── task_planner.py            # Task decomposition
+│   └── task_executor.py           # Task execution
+├── models/
+│   ├── agent.py                   # Agent data model
+│   ├── task.py                    # Task data model
+│   ├── memory.py                  # Memory data model
+│   └── agent_config_template.py   # Template data model
+├── config/
+│   └── agent_templates.yaml       # YAML template definitions
+└── agents/
+    ├── a2a_protocol.py            # A2A protocol definitions
+    ├── langgraph_agent.py         # LangGraph implementation
+    └── api_agent.py               # Simple API implementation
 ```
 
 ### 3. A2A Server Service (Port 8001)
@@ -195,7 +235,128 @@ LangGraph Workflow:
 - Basic Python processing
 - Direct LLM API calls
 
+### 5. Dummy Agent Services (Ports 8003-8005)
+
+Example implementations demonstrating different agent frameworks and protocols.
+
+**CrewAI Agent (Port 8003)**
+- **Framework**: CrewAI multi-agent framework
+- **Features**: Role-based agent collaboration, workflow management
+- **Template**: crewai
+- **Use Case**: Complex multi-agent workflows with specialized roles
+
+**Databricks Agent (Port 8004)**
+- **Framework**: Databricks Foundation Models
+- **Features**: Integration with Databricks LLM serving endpoints
+- **Template**: databricks_foundation
+- **Models**: Llama, Mistral, DBRX
+
+**OpenAI Compatible Agent (Port 8005)**
+- **Framework**: OpenAI API compatible
+- **Features**: Chat completions, standard OpenAI format
+- **Template**: openai_compatible
+- **Models**: GPT-3.5-turbo, GPT-4, GPT-4-turbo
+
+### 6. Custom Agent Services (Ports 8006+)
+
+User-registered agents using:
+- Custom REST API protocols
+- Template-based configuration
+- Dynamic registration
+- Framework-agnostic integration
+
 ## 📊 Data Flow
+
+### Agent Registration Flow
+
+```
+┌──────────────┐
+│   User       │
+│ (Power Mode) │
+└──────┬───────┘
+       │
+       │ 1. Enable Power User mode
+       │
+       ▼
+┌──────────────────────────┐
+│   Frontend (3000)        │
+│   • Show registration UI │
+│   • Load templates       │
+└──────┬───────────────────┘
+       │
+       │ 2. GET /api/agent-templates
+       │
+       ▼
+┌────────────────────────────────────────────┐
+│   Agent Registration Service               │
+│   • Return available templates             │
+│     - CrewAI                               │
+│     - Databricks                           │
+│     - OpenAI Compatible                    │
+│     - Custom                               │
+└──────┬─────────────────────────────────────┘
+       │
+       │ 3. Templates displayed
+       │
+       ▼
+┌──────────────────────────┐
+│   User                   │
+│   • Select template      │
+│   • Enter endpoint URL   │
+│   • Configure agent      │
+└──────┬───────────────────┘
+       │
+       │ 4. Test Connection
+       │    POST /api/agents/test-connection
+       │
+       ▼
+┌────────────────────────────────────────────┐
+│   Agent Registration Service               │
+│   • Apply template request mapping         │
+│   • Send test request to agent             │
+│   • Validate response format               │
+│   • Extract result using JSONPath          │
+└──────┬─────────────────────────────────────┘
+       │
+       │ 5. Connection test result
+       │
+       ▼
+┌──────────────────────────┐
+│   User                   │
+│   • Review test result   │
+│   • Confirm registration │
+└──────┬───────────────────┘
+       │
+       │ 6. Register Agent
+       │    POST /api/agents/register-with-template
+       │
+       ▼
+┌────────────────────────────────────────────┐
+│   Agent Registration Service               │
+│   • Validate configuration                 │
+│   • Create agent record                    │
+└──────┬─────────────────────────────────────┘
+       │
+       │ 7. Save to registry
+       │
+       ▼
+┌────────────────────────────────────────────┐
+│   Agent Registry                           │
+│   • Store agent metadata                   │
+│   • Store template config                  │
+│   • Set status to 'active'                 │
+└──────┬─────────────────────────────────────┘
+       │
+       │ 8. Agent registered successfully
+       │
+       ▼
+┌──────────────────────────┐
+│   Frontend (3000)        │
+│   • Show success message │
+│   • Add to agent list    │
+│   • Enable for tasks     │
+└───────────────────────────┘
+```
 
 ### Complete Request Flow
 
@@ -828,9 +989,23 @@ async def execute_parallel_steps(steps):
 
 ## 🔄 Version History
 
+- **v1.1.0** (2025-11-05) - Updated with agent registration system
+  - Added Agent Registration Service module
+  - Added template-based agent registration flow
+  - Added dummy agent services (CrewAI, Databricks, OpenAI)
+  - Updated system architecture diagrams
+  - Added custom agent support documentation
+
 - **v1.0.0** (2025-11-02) - Initial service flow documentation
 
 ---
 
 For questions or clarifications about the service flow, please open an issue on GitHub.
+
+## 📚 Related Documentation
+
+- [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) - Complete system architecture
+- [AGENT_REGISTRATION_IMPLEMENTATION.md](AGENT_REGISTRATION_IMPLEMENTATION.md) - Agent registration details
+- [YAML_CONFIGURATION_GUIDE.md](YAML_CONFIGURATION_GUIDE.md) - Template configuration guide
+- [API_GUIDE.md](API_GUIDE.md) - Complete API reference
 
